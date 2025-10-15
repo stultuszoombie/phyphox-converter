@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Convertitore Raw Data Phyphox (Beta)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f9fafb;
+    }
+    .chart-container {
+      background-color: white;
+      padding: 1.5rem;
+      border-radius: 0.75rem;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      margin-bottom: 1.5rem;
+    }
+    .file-input-label {
+      cursor: pointer;
+      padding: 0.75rem 1.5rem;
+      background-color: #4f46e5;
+      color: white;
+      border-radius: 0.5rem;
+      transition: background-color 0.3s ease;
+    }
+    .file-input-label:hover {
+      background-color: #4338ca;
+    }
+    .summary-card {
+      background-color: #e0e7ff;
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-top: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+      font-size: 1.1rem;
+    }
+    .warning-card {
+      background-color: #fee2e2;
+      color: #b91c1c;
+      border-radius: 0.75rem;
+      padding: 1.2rem;
+      margin-bottom: 1.5rem;
+      border-left: 6px solid #f87171;
+      font-size: 1.05rem;
+    }
+    .disclaimer-footer {
+      margin-top: 4rem;
+      padding: 1.2rem;
+      font-size: 0.95rem;
+      color: #6b7280;
+      background: #f3f4f6;
+      border-radius: 0.5rem;
+    }
+    .disclaimer-footer a {
+      color: #6366f1;
+      text-decoration: underline;
+    }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body class="p-4 sm:p-6 md:p-8">
+  <div class="max-w-7xl mx-auto">
+    <header class="text-center mb-8">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Convertitore Raw Data Phyphox (Beta)</h1>
+      <p class="text-lg text-gray-600 mt-2">Carica il tuo file CSV Phyphox per visualizzare grafici e riassunto di accelerazione, velocità e spostamento.</p>
+      <div class="mt-6 flex flex-col items-center gap-4">
+        <input type="file" id="csvFileInput" accept=".csv" class="hidden" />
+        <label for="csvFileInput" class="file-input-label font-semibold">Seleziona un file CSV</label>
+        <div>
+          <label for="unitSelector" class="block text-sm font-medium text-gray-700 mb-1">Unità di misura dello spostamento:</label>
+          <select id="unitSelector" class="p-2 rounded bg-white shadow" aria-label="Seleziona unità">
+            <option value="m">Metri</option>
+            <option value="cm">Centimetri</option>
+            <option value="mm">Millimetri</option>
+          </select>
+        </div>
+        <div class="flex gap-4 items-center">
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" id="toggleLowPass" />
+            Filtro passa-basso
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" id="toggleFourier" />
+            Filtro Fourier
+          </label>
+        </div>
+      </div>
+    </header>
+    <h2 id="acceleration-title" class="text-2xl font-bold text-gray-700 mt-10 mb-4 hidden">Grafici Accelerazione</h2>
+    <main id="charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div id="initial-message" class="lg:col-span-2 text-center p-10 bg-white rounded-lg shadow-md">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-6 0h6M9 19a2 2 0 00-2 2h10a2 2 0 00-2-2M9 19c-1.105 0-2-.895-2-2V7a2 2 0 012-2h6a2 2 0 012 2v10c0 1.105-.895 2-2 2M12 11h.01" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">Nessun dato da visualizzare</h3>
+        <p class="mt-1 text-sm text-gray-500">Carica un file CSV per iniziare.</p>
+      </div>
+    </main>
+    <div id="derived-analysis-section" class="hidden mt-10">
+      <h2 class="text-2xl font-bold text-gray-700 mb-4">Analisi Derivata</h2>
+      <div id="calculated-values-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6"></div>
+      <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md mb-6" role="alert">
+        <p class="font-bold">Nota sulla Precisione</p>
+        <p>I calcoli di velocità e spostamento sono ottenuti integrando i dati dell'accelerometro. Questo processo è sensibile a piccoli errori di misurazione che possono accumularsi nel tempo (drift), portando a stime imprecise, specialmente su lunghe durate.</p>
+      </div>
+      <h3 class="text-xl font-semibold text-gray-700 mt-8 mb-4">Grafici Velocità</h3>
+      <div id="velocity-charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>
+      <h3 class="text-xl font-semibold text-gray-700 mt-8 mb-4">Grafici Spostamento</h3>
+      <div id="displacement-charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>
+      <div id="summary-warning"></div>
+      <div id="summary-displacement"></div>
+    </div>
+    <!-- Disclaimer e attribuzioni -->
+    <footer class="disclaimer-footer text-center">
+      <p>
+        Questo strumento utilizza <a href="https://www.chartjs.org/" target="_blank" rel="noopener">Chart.js</a>
+        e <a href="https://tailwindcss.com/" target="_blank" rel="noopener">Tailwind CSS</a>.<br>
+        Tutti i marchi e software citati sono di proprietà dei rispettivi autori.<br>
+        Progetto open source a scopo didattico.
+      </p>
+    </footer>
+   </div>
+   <script>
+const fileInput = document.getElementById('csvFileInput');
+const chartsContainer = document.getElementById('charts-container');
+const initialMessage = document.getElementById('initial-message');
+const accelerationTitle = document.getElementById('acceleration-title');
+const unitSelector = document.getElementById('unitSelector');
+const toggleLowPass = document.getElementById('toggleLowPass');
+const toggleFourier = document.getElementById('toggleFourier');
+const summaryDisplacement = document.getElementById('summary-displacement');
+
+let chartInstances = [];
+let originalData = null;
+
+fileInput.addEventListener('change', event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { // 5 MB
+    alert('Il file è troppo grande (>5MB): il browser potrebbe rallentare/bloccarsi!');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    parseAndDisplayCSV(text);
+  };
+  reader.readAsText(file);
+});
+
+unitSelector.addEventListener('change', () => {
+  if (originalData) processAndDisplayData();
+});
+toggleLowPass.addEventListener('change', () => {
+  if (originalData) processAndDisplayData();
+});
+toggleFourier.addEventListener('change', () => {
+  if (originalData) processAndDisplayData();
+});
+
+function parseAndDisplayCSV(csvText) {
+  initialMessage.style.display = 'none';
+  accelerationTitle.classList.remove('hidden');
+  destroyCharts();
+  chartsContainer.innerHTML = '';
+  document.getElementById('derived-analysis-section').classList.add('hidden');
+  summaryDisplacement.innerHTML = '';
+
+  const lines = csvText.trim().split('\n');
+  const dataRows = lines.slice(1);
+
+  const time = [], accX = [], accY = [], accZ = [], accAbs = [];
+  dataRows.forEach(row => {
+    const cleanedRow = row.replace(/"/g, '');
+    const values = cleanedRow.split(';').map(v => parseFloat(v.replace(',', '.')));
+    if (values.length === 5 && values.every(v => !isNaN(v))) {
+      const [t, x, y, z, abs] = values;
+      time.push(t);
+      accX.push(x);
+      accY.push(y);
+      accZ.push(z);
+      accAbs.push(abs);
+    }
+  });
+
+  if (time.length === 0) {
+    chartsContainer.innerHTML = `<div class="lg:col-span-2 text-center p-10 bg-red-50 rounded-lg shadow-md border border-red-200">
+      <h3 class="text-sm font-medium text-red-800">Errore nel file</h3>
+      <p class="mt-1 text-sm text-red-700">Formato CSV non valido.</p>
+    </div>`;
+    return;
+  }
+
+  originalData = { time, accX, accY, accZ, accAbs };
+  processAndDisplayData();
+}
+
+function processAndDisplayData() {
+  destroyCharts();
+  chartsContainer.innerHTML = '';
+  summaryDisplacement.innerHTML = '';
+
+  // Applica i filtri se selezionati
+  let accXFiltered = applyFilters(originalData.accX);
+  let accYFiltered = applyFilters(originalData.accY);
+  let accZFiltered = applyFilters(originalData.accZ);
+  let accAbsFiltered = applyFilters(originalData.accAbs);
+
+  const accCanvasIds = ['accXChart', 'accYChart', 'accZChart', 'accAbsChart'];
+  accCanvasIds.forEach(id => createCanvasInContainer(chartsContainer, id));
+  createChart('accXChart', originalData.time, accXFiltered, 'Accelerazione X', 'rgba(239, 68, 68, 1)', 'Accelerazione (m/s²)');
+  createChart('accYChart', originalData.time, accYFiltered, 'Accelerazione Y', 'rgba(34, 197, 94, 1)', 'Accelerazione (m/s²)');
+  createChart('accZChart', originalData.time, accZFiltered, 'Accelerazione Z', 'rgba(59, 130, 246, 1)', 'Accelerazione (m/s²)');
+  createChart('accAbsChart', originalData.time, accAbsFiltered, 'Accelerazione Assoluta', 'rgba(139, 92, 246, 1)', 'Accelerazione (m/s²)');
+
+  const derivedData = calculateDerivedData(originalData.time, accXFiltered, accYFiltered, accZFiltered);
+  displayDerivedData(originalData.time, derivedData);
+}
+
+function applyFilters(data) {
+  let filtered = [...data];
+  if (toggleLowPass.checked) filtered = lowPassFilter(filtered);
+  if (toggleFourier.checked) filtered = applyFourierFilter(filtered);
+  return filtered;
+}
+
+function lowPassFilter(data, windowSize = 5) {
+  const filtered = [];
+  for (let i = 0; i < data.length; i++) {
+    const start = Math.max(0, i - windowSize + 1);
+    const window = data.slice(start, i + 1);
+    const avg = window.reduce((a, b) => a + b, 0) / window.length;
+    filtered.push(avg);
+  }
+  return filtered;
+}
+
+// DFT + filtro frequenze alte, ricostruisce il segnale filtrato
+function applyFourierFilter(data, threshold = 0.1) {
+  const N = data.length;
+  const re = new Array(N).fill(0);
+  const im = new Array(N).fill(0);
+
+  for (let k = 0; k < N; k++) {
+    for (let n = 0; n < N; n++) {
+      const angle = (2 * Math.PI * k * n) / N;
+      re[k] += data[n] * Math.cos(angle);
+      im[k] -= data[n] * Math.sin(angle);
+    }
+  }
+  for (let k = 0; k < N; k++) {
+    if (k / N > threshold) { re[k] = 0; im[k] = 0; }
+  }
+  const filtered = [];
+  for (let n = 0; n < N; n++) {
+    let sum = 0;
+    for (let k = 0; k < N; k++) {
+      const angle = (2 * Math.PI * k * n) / N;
+      sum += re[k] * Math.cos(angle) - im[k] * Math.sin(angle);
+    }
+    filtered.push(sum / N);
+  }
+  return filtered;
+}
+
+// Calcolo integrale con compensazione: usa differenza Δa per ogni step
+function calculateDerivedData(time, accX, accY, accZ) {
+  const G = 9.80665;
+  const velX = [0], velY = [0], velZ = [0];
+  const dispX = [0], dispY = [0], dispZ = [0];
+
+  for (let i = 1; i < time.length; i++) {
+    const dt = time[i] - time[i - 1];
+    if (dt <= 0) continue;
+    // Compensazione su accelerazione: Δa = a(i) - a(i-1)
+    const deltaAccX = accX[i] - accX[i - 1];
+    const deltaAccY = accY[i] - accY[i - 1];
+    const deltaAccZ = accZ[i] - accZ[i - 1];
+
+    velX.push(velX[i - 1] + deltaAccX * dt);
+    velY.push(velY[i - 1] + deltaAccY * dt);
+    velZ.push(velZ[i - 1] + deltaAccZ * dt);
+    dispX.push(dispX[i - 1] + (velX[i] + velX[i - 1]) / 2 * dt);
+    dispY.push(dispY[i - 1] + (velY[i] + velY[i - 1]) / 2 * dt);
+    dispZ.push(dispZ[i - 1] + (velZ[i] + velZ[i - 1]) / 2 * dt);
+  }
+
+  const avgAccX = accX.reduce((a, b) => a + b, 0) / accX.length;
+  const avgAccY = accY.reduce((a, b) => a + b, 0) / accY.length;
+
+  let angleX = Math.abs(avgAccX / G) <= 1 ? Math.asin(avgAccX / G) * (180 / Math.PI) : null;
+  let angleY = Math.abs(avgAccY / G) <= 1 ? Math.asin(avgAccY / G) * (180 / Math.PI) : null;
+
+  return { velX, velY, velZ, dispX, dispY, dispZ, angleX, angleY };
+}
+
+function convertDisplacement(value, unit) {
+  if (unit === 'cm') return value * 100;
+  if (unit === 'mm') return value * 1000;
+  return value;
+}
+
+function displayDerivedData(time, derivedData) {
+  const section = document.getElementById('derived-analysis-section');
+  section.classList.remove('hidden');
+
+  const valuesContainer = document.getElementById('calculated-values-container');
+  const velocityContainer = document.getElementById('velocity-charts-container');
+  const displacementContainer = document.getElementById('displacement-charts-container');
+  valuesContainer.innerHTML = '';
+  velocityContainer.innerHTML = '';
+  displacementContainer.innerHTML = '';
+  summaryDisplacement.innerHTML = '';
+
+  const unit = unitSelector.value;
+  const angleXText = derivedData.angleX !== null ? `${derivedData.angleX.toFixed(2)}°` : 'N/D';
+  const angleYText = derivedData.angleY !== null ? `${derivedData.angleY.toFixed(2)}°` : 'N/D';
+
+  valuesContainer.innerHTML = `
+    <div class="bg-white p-4 rounded-lg shadow h-full">
+      <h4 class="font-semibold text-gray-600">Pendenza Stimata (X)</h4>
+      <p class="text-3xl font-bold text-indigo-600">${angleXText}</p>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow h-full">
+      <h4 class="font-semibold text-gray-600">Pendenza Stimata (Y)</h4>
+      <p class="text-3xl font-bold text-indigo-600">${angleYText}</p>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow h-full">
+      <h4 class="font-semibold text-gray-600">Durata Totale</h4>
+      <p class="text-3xl font-bold text-indigo-600">${time[time.length - 1].toFixed(2)} s</p>
+    </div>
+  `;
+
+  const dispX = derivedData.dispX.map(v => convertDisplacement(v, unit));
+  const dispY = derivedData.dispY.map(v => convertDisplacement(v, unit));
+  const dispZ = derivedData.dispZ.map(v => convertDisplacement(v, unit));
+
+  createCanvasInContainer(velocityContainer, 'velXChart');
+  createCanvasInContainer(velocityContainer, 'velYChart');
+  createCanvasInContainer(velocityContainer, 'velZChart');
+  createChart('velXChart', time, derivedData.velX, 'Velocità X', 'rgba(217, 70, 239, 1)', 'Velocità (m/s)');
+  createChart('velYChart', time, derivedData.velY, 'Velocità Y', 'rgba(244, 114, 182, 1)', 'Velocità (m/s)');
+  createChart('velZChart', time, derivedData.velZ, 'Velocità Z', 'rgba(251, 146, 60, 1)', 'Velocità (m/s)');
+
+  createCanvasInContainer(displacementContainer, 'dispXChart');
+  createCanvasInContainer(displacementContainer, 'dispYChart');
+  createCanvasInContainer(displacementContainer, 'dispZChart');
+  createChart('dispXChart', time, dispX, `Spostamento X (${unit})`, 'rgba(163, 230, 53, 1)', `Spostamento (${unit})`);
+  createChart('dispYChart', time, dispY, `Spostamento Y (${unit})`, 'rgba(52, 211, 153, 1)', `Spostamento (${unit})`);
+  createChart('dispZChart', time, dispZ, `Spostamento Z (${unit})`, 'rgba(45, 212, 191, 1)', `Spostamento (${unit})`);
+
+  // Riassunto spostamenti finali
+  const lastX = dispX[dispX.length - 1];
+  const lastY = dispY[dispY.length - 1];
+  const lastZ = dispZ[dispZ.length - 1];
+  summaryDisplacement.innerHTML = `
+    <div class="summary-card">
+      <h4 class="font-bold text-indigo-700 mb-2">Riassunto Spostamenti Finali</h4>
+      <ul>
+        <li><strong>ΔX:</strong> ${lastX.toFixed(5)} ${unit}</li>
+        <li><strong>ΔY:</strong> ${lastY.toFixed(5)} ${unit}</li>
+        <li><strong>ΔZ:</strong> ${lastZ.toFixed(5)} ${unit}</li>
+      </ul>
+    </div>
+  `;
+}
+
+function createCanvasInContainer(container, id) {
+  const chartWrapper = document.createElement('div');
+  chartWrapper.className = 'chart-container';
+  const canvas = document.createElement('canvas');
+  canvas.id = id;
+  chartWrapper.appendChild(canvas);
+  container.appendChild(chartWrapper);
+}
+
+function createChart(canvasId, labels, data, label, color, yAxisLabel) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: label,
+        data: data,
+        borderColor: color,
+        backgroundColor: color.replace('1)', '0.2)'),
+        borderWidth: 1.5,
+        fill: true,
+        pointRadius: 0,
+        tension: 0.1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top' },
+        title: { display: true, text: label, font: { size: 16 } }
+      },
+      scales: {
+        y: { title: { display: true, text: yAxisLabel } },
+        x: { title: { display: true, text: 'Tempo (s)' } }
+      }
+    }
+  });
+  chartInstances.push(chart);
+}
+
+function destroyCharts() {
+  chartInstances.forEach(chart => chart.destroy());
+  chartInstances = [];
+}
+   </script>
+</body>
+</html>
