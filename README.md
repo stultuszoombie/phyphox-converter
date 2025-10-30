@@ -40,16 +40,16 @@ Permette di caricare file CSV, applicare compensazioni e filtri, calcolare veloc
 ## 🖼️ Screenshot
 
 ### Interfaccia iniziale
-![Interfaccia iniziale](link-alla-tua-immagine)
+![Interfaccia iniziale](https://github.com/stultuszoombie/phyphox-converter/blob/main/images/interfaccia.png)
 
 ### Grafici Accelerazione
-![Grafici Accelerazione](link-alla-tua-immagine)
+![Grafici Accelerazione](https://github.com/stultuszoombie/phyphox-converter/blob/main/images/accel.png)
 
 ### Grafici Velocità
-![Grafici Velocità](link-alla-tua-immagine)
+![Grafici Velocità](https://github.com/stultuszoombie/phyphox-converter/blob/main/images/velox.png)
 
 ### Grafici Spostamento
-![Grafici Spostamento](link-alla-tua-immagine)
+![Grafici Spostamento](https://github.com/stultuszoombie/phyphox-converter/blob/main/images/spostamento.png)
 
 ### Analisi Derivata
 ![Analisi Derivata](link-alla-tua-immagine)
