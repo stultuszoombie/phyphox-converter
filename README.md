@@ -52,7 +52,7 @@ Permette di caricare file CSV, applicare compensazioni e filtri, calcolare veloc
 ![Grafici Spostamento](https://github.com/stultuszoombie/phyphox-converter/blob/main/images/spostamento.png)
 
 ### Analisi Derivata
-![Analisi Derivata](link-alla-tua-immagine)
+![Analisi Derivata](https://github.com/stultuszoombie/phyphox-converter/blob/main/images/derivata.png)
 
 ---
 
