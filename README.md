@@ -114,7 +114,8 @@ Vedi il file [LICENSE](LICENSE).
 
 ### 🧑‍💻 Autore
 
-Shaped by **S͓͎̻͕̥͓̘͑̔̇̈́̍͂̏̃͜t̴̲̟̖͖̰̀͒̈́̉ű͔͉͙̯̝ͭ̅ͣl̡͎̥͖̼̱̐̅́ͫ́͡͡t̶̯̫̼̜̩͚̤̜̆̏ͬ͂ͩ͗͛̈́ư̢͔̮̜̞̝̂̉ͮ͊ͮͤ́Ƨ̨̞͇̜̬̦̺ͨ̊́̽̾͛ͦͅ** Powered by WstT.org
+Shaped by **S͓͎̻͕̥͓̘͑̔̇̈́̍͂̏̃͜t̴̲̟̖͖̰̀͒̈́̉ű͔͉͙̯̝ͭ̅ͣl̡͎̥͖̼̱̐̅́ͫ́͡͡t̶̯̫̼̜̩͚̤̜̆̏ͬ͂ͩ͗͛̈́ư̢͔̮̜̞̝̂̉ͮ͊ͮͤ́Ƨ̨̞͇̜̬̦̺ͨ̊́̽̾͛ͦͅ** Powered by [WstT](https://wstt.org/)
+
 
 ---
 
@@ -127,5 +128,9 @@ Tutti i marchi citati sono dei rispettivi proprietari.
 ---
 
 💙 Dedicato ai miei figli
+
+---
+
+[<img src="https://github.com/stultuszoombie/phyphox-converter/blob/main/images/ezone-logo-sfumato-oro%20(1).png" alt="WstT Logo" width="150"/>](https://wstt.org/)
 
 ---
