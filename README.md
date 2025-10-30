@@ -1,42 +1,91 @@
-# Phyphox Raw Data Converter
+# Phyphox Converter (Versione Free)
 
-Convertitore di dati raw da Phyphox a grafici e riassunto di spostamenti, velocità e accelerazione.
-# 📊 Convertitore Raw Data Phyphox (Ottimizzato)
-
-### 🎯 Descrizione
-
-Questo progetto è uno strumento web interattivo per visualizzare e analizzare i dati grezzi esportati da **Phyphox**, l'app per esperimenti fisici. Permette di caricare file CSV, applicare filtri, visualizzare grafici e ottenere analisi derivate come velocità, spostamento e pendenza.
-
----
-
-### 🚀 Funzionalità principali
-
-- 📁 **Upload CSV**: Carica file generati da Phyphox con dati di accelerazione.
-- 📊 **Grafici dinamici**: Visualizzazione interattiva di accelerazioni, velocità e spostamenti.
-- 🧮 **Analisi derivata**: Calcolo di velocità e spostamento tramite integrazione trapezoidale.
-- 🧭 **Stima pendenza**: Calcolo angolo di inclinazione basato sull'accelerazione media.
-- 🧹 **Rimozione offset/gravità**: Pulsante per compensare l'accelerazione residua.
-- 🧪 **Filtri opzionali**:
-  - Filtro passa-basso (media mobile)
-  - Filtro Fourier (placeholder, estendibile)
-- 📦 **Esportazione CSV**: Salvataggio dei dati derivati in formato CSV.
-- 🖨️ **Modalità stampa**: Layout ottimizzato per la stampa del report.
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Made with](https://img.shields.io/badge/Made%20with-JavaScript-yellow)
+![Status](https://img.shields.io/badge/Status-Active-blue)
+![Contributions](https://img.shields.io/badge/Contributions-Welcome-brightgreen)
+![Platform](https://img.shields.io/badge/Platform-Web-lightgrey)
 
 ---
 
-### 🛠️ Tecnologie utilizzate
-
-- [Chart.js](https://www.chartjs.org/) – per la visualizzazione grafica
-- [PapaParse](https://www.papaparse.com/) – per il parsing dei file CSV
-- [Tailwind CSS](https://tailwindcss.com/) – per lo stile responsivo e moderno
-- JavaScript Vanilla – per la logica e l'interattività
+Convertitore ed elaboratore di dati accelerometrici esportati da [Phyphox](https://phyphox.org).  
+Permette di caricare file CSV, applicare compensazioni e filtri, calcolare velocità e spostamenti, stimare inclinazioni e visualizzare i risultati con grafici interattivi.
 
 ---
 
-### 📂 Struttura del progetto
+## 🚀 Funzionalità principali
 
-- `index.html` – file principale con layout, script e stile
-- Tutto il codice è contenuto in un singolo file HTML per facilità d'uso
+- **Parsing CSV robusto** (PapaParse streaming)
+- **Compensazione gravitazionale (Zeroing)** con offset sui primi N punti
+- **Filtri**:
+  - Passa-basso (media mobile)
+  - Fourier (DFT + IDFT, soglia regolabile 5–50 Hz)
+- **Elaborazione dati**:
+  - Frequenza di campionamento dinamica
+  - Doppia integrazione trapezoidale
+  - Correzione deriva lineare/cubica
+  - Calcolo inclinazioni (pitch/roll)
+- **Visualizzazione grafica**:
+  - Accelerazione, velocità, spostamento, inclinazione
+  - Evidenziazione picchi locali
+  - Zoom/pan interattivi
+  - Modalità notte
+- **Report ed esportazione**:
+  - Riepilogo finale con statistiche
+  - Stampa report
+  - Download CSV dei dati derivati
+
+---
+
+## 🖼️ Screenshot
+
+### Interfaccia iniziale
+![Interfaccia iniziale](link-alla-tua-immagine)
+
+### Grafici Accelerazione
+![Grafici Accelerazione](link-alla-tua-immagine)
+
+### Grafici Velocità
+![Grafici Velocità](link-alla-tua-immagine)
+
+### Grafici Spostamento
+![Grafici Spostamento](link-alla-tua-immagine)
+
+### Analisi Derivata
+![Analisi Derivata](link-alla-tua-immagine)
+
+---
+
+## 📐 Linee guida di calcolo
+
+- **Pendenza (pitch/roll)** → calcolata su dati grezzi (gravità inclusa).
+- **Velocità e spostamento** → calcolati su dati compensati (gravità rimossa).
+- **Regola millimetrica** → se ΔX/Y/Z < 1 mm, i filtri vengono disabilitati automaticamente.
+- **Decimazione** → riduce i dati per evitare collasso del browser.
+
+---
+
+## 📂 Istruzioni d’uso
+
+1. **Seleziona unità di misura output** (m, cm, mm) prima di caricare il file.
+2. **Carica il CSV** esportato da Phyphox (con “g inclusa”).
+3. **Attiva/disattiva compensazione e filtri** secondo necessità.
+4. **Elabora i dati** → vengono generati grafici e statistiche.
+5. **Esporta o stampa** i risultati.
+
+---
+
+## 📤 Esportazione
+
+- CSV con accelerazioni filtrate, velocità, spostamenti, tempo.
+- Report stampabile con statistiche (max, min, media).
+
+---
+
+## 🖋️ Credits
+
+- Librerie: [Chart.js](https://www.chartjs.org/), [Tailwind CSS](https://tailwindcss.com/), [PapaParse](https://www.papaparse.com/)
+- Ottimizzato con il supporto di **Copilot AI by Microsoft**
 
 ---
 
@@ -44,12 +93,6 @@ Questo progetto è uno strumento web interattivo per visualizzare e analizzare i
 
 - Il filtro Fourier è attualmente un **placeholder**: per un'elaborazione reale si consiglia l'integrazione di una libreria FFT.
 - Il pulsante "Rimuovi Offset/Gravità" modifica i dati in memoria ma non li ripristina: per tornare ai dati originali, è necessario ricaricare il file.
-
----
-
-### 📷 Screenshot (opzionale)
-
-Puoi aggiungere immagini del layout, dei grafici o della stampa per mostrare il funzionamento.
 
 ---
 
@@ -62,32 +105,27 @@ Se vuoi migliorare il progetto, puoi:
 
 ---
 
-## Come funziona
-
-1. Carica il tuo file CSV esportato da Phyphox.
-2. Visualizza i grafici di accelerazione, velocità e spostamento.
-3. Puoi scegliere l’unità di misura (m, cm, mm) e applicare/disattivare filtri sui dati.
-4. Il tool mostra avvisi se i dati sono troppo piccoli o se il file è troppo grande.
-
-## Avvertenze
-
-- Per spostamenti inferiori al millimetro è consigliato disabilitare i filtri per una dinamica più realistica.
-- I risultati sono calcolati tramite integrazione dei dati e possono essere influenzati da errori del sensore.
-
 ## Licenza
 
 Questo progetto è rilasciato sotto licenza MIT.  
 Vedi il file [LICENSE](LICENSE).
 
-
 ---
-
 
 ### 🧑‍💻 Autore
 
-Creato da **S͓͎̻͕̥͓̘͑̔̇̈́̍͂̏̃͜t̴̲̟̖͖̰̀͒̈́̉ű͔͉͙̯̝ͭ̅ͣl̡͎̥͖̼̱̐̅́ͫ́͡͡t̶̯̫̼̜̩͚̤̜̆̏ͬ͂ͩ͗͛̈́ư̢͔̮̜̞̝̂̉ͮ͊ͮͤ́Ƨ̨̞͇̜̬̦̺ͨ̊́̽̾͛ͦͅ**
+Shaped by **S͓͎̻͕̥͓̘͑̔̇̈́̍͂̏̃͜t̴̲̟̖͖̰̀͒̈́̉ű͔͉͙̯̝ͭ̅ͣl̡͎̥͖̼̱̐̅́ͫ́͡͡t̶̯̫̼̜̩͚̤̜̆̏ͬ͂ͩ͗͛̈́ư̢͔̮̜̞̝̂̉ͮ͊ͮͤ́Ƨ̨̞͇̜̬̦̺ͨ̊́̽̾͛ͦͅ** Powered by WstT.org
 
-Progetto open source a scopo didattico.  
+---
+
 Tutti i marchi citati sono dei rispettivi proprietari.
 
+---
+
 **Progetto open source a scopo didattico.**
+
+---
+
+💙 Dedicato ai miei figli
+
+---
