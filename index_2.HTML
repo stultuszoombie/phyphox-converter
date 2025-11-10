@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Phyphox Converter — Analisi Avanzata (Rev 7 - FIT? Corretto)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.2/dist/chartjs-plugin-zoom.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="https://unpkg.com/fft.js@4.0.0/dist/fft.min.js"></script>
+    
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        if (typeof Chart !== 'undefined') {
+          if (typeof ChartjsPluginZoom !== 'undefined') {
+            Chart.register(ChartjsPluginZoom);
+          }
+          if (typeof ChartjsPluginAnnotation !== 'undefined') {
+            Chart.register(ChartjsPluginAnnotation);
+          }
+        } else {
+          console.error("Chart.js non è stato caricato correttamente.");
+        }
+      });
+    </script>
+    
+    <style>
+      :root {
+        --bg: #111827;
+        --text: #f9fafb;
+        --card: #ffffff;
+        --muted: #6366f1;
+        --accent: #9ca3af;
+      }
+      .dark-mode {
+        --bg: #111827;
+        --text: #f9fafb;
+        --card: #1f2937;
+        --muted: #9ca3af;
+        --accent: #6366f1;
+      }
+      html, body { height: 100% }
+      body {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 1.25rem;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      .card {
+        background: var(--card);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+        border: 1px solid rgba(0, 0, 0, 0.04);
+      }
+      .chart-container {
+        background: var(--card);
+        padding: 0.75rem;
+        border-radius: 0.6rem;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+        height: 360px;
+        margin-bottom: 1rem;
+      }
+      .is-hidden { display: none !important; }
+      .small { font-size: 0.85rem; color: var(--muted); }
+      .kbd {
+        background: rgba(0, 0, 0, 0.05);
+        padding: 0.15rem 0.4rem;
+        border-radius: 0.35rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+        font-size: .78rem;
+      }
+      @media (max-width: 640px) {
+        .chart-container { height: 260px; }
+      }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-6 text-center relative">
+            <h1 class="text-2xl md:text-3xl font-semibold">Phyphox Converter — Analisi Avanzata
+            </h1>
+            <p class="small mt-1">Compensazione G, detrending, doppia integrazione, LPF e filtro Fourier. Segui il protocollo operativo obbligatorio.
+            </p>
+            <button id="darkToggle" class="absolute top-0 right-0 px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded">Dark Mode
+            </button>
+        </header>
+        <section id="controlsCard" class="card mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Unità di output (obbligatoria)
+                    </label>
+                    <select id="unitSelector" class="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600">
+                        <option value="" selected disabled>Seleziona unità
+                        </option>
+                        <option value="m">Metri (m)
+                        </option>
+                        <option value="cm">Centimetri (cm)
+                        </option>
+                        <option value="mm">Millimetri (mm)
+                        </option>
+                    </select>
+                    <p class="small mt-1">Selezione obbligatoria.
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Decimazione (obbligatoria)
+                    </label>
+                    <select id="decimationSelector" class="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600">
+                        <option value="" selected disabled>Seleziona risoluzione
+                        </option>
+                        <option value="1">Alta (1:1)
+                        </option>
+                        <option value="2">Media (1:2)
+                        </option>
+                        <option value="4">Bassa (1:4)
+                        </option>
+                        <option value="10">Molto Bassa (1:10)
+                        </option>
+                    </select>
+                    <p class="small mt-1">Imposta prima dell'upload.
+                    </p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1">Tipo di Filtro (obbligatorio)
+                    </label>
+                    <select id="filterTypeSelector" class="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600">
+                        <option value="" selected disabled>Seleziona filtro
+                        </option>
+                        <option value="none">Nessun Filtro (Veloce)
+                        </option>
+                        <option value="lpf">Filtro LPF (Media Mobile)
+                        </option>
+                        <option value="fft">Filtro FFT (Fourier Cutoff)
+                        </option>
+                    </select>
+                    <p class="small mt-1">Scelta obbligatoria.
+                    </p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1">Delimiter (opzionale)
+                    </label>
+                    <select id="delimiterSelector" class="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600">
+                        <option value="" selected>Auto-detect (consigliato)
+                        </option>
+                        <option value=";">Punto e virgola ;
+                        </option>
+                        <option value=",">Virgola ,
+                        </option>
+                        <option value="\t">Tab
+                        </option>
+                        <option value="|">Pipe |
+                        </option>
+                    </select>
+                    <p class="small mt-1">Usa solo se l'auto-detect fallisce.
+                    </p>
+                </div>
+                <div class="md:col-span-4"> 
+                    <label class="block text-sm font-medium mb-1">Seleziona file CSV (Phyphox)
+                    </label>
+                    <input id="csvFile" type="file" accept=".csv,text/csv" class="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600" disabled>
+                    <p class="small mt-1">Formato atteso: Time;Acceleration x;Acceleration y;Acceleration z; (Absolute opzionale)
+                    </p>
+                </div>
+            </div>
+            <div id="statusLine" class="mt-4 small text-red-600">Seleziona unità, decimazione e tipo di filtro prima di caricare il CSV.
+            </div>
+        </section>
+        <section id="analysisDetails" class="card mb-6 is-hidden">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div><strong>Sampling Rate (Hz):</strong>
+                    <span id="samplingRateDisplay">0
+                    </span>
+                </div>
+                <div><strong>Punti Raw:</strong>
+                    <span id="rawCountDisplay">0
+                    </span>
+                </div>
+                <div><strong>Offset Gravità Z:</strong>
+                    <span id="gravityOffsetDisplay">0
+                    </span>
+                </div>
+                <div><strong>Punti Decimati:</strong>
+                    <span id="decimatedPointsDisplay">0
+                    </span>
+                </div>
+            </div>
+        </section>
+        
+        <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div></div>
+            <div id="nyquistCursorSection" class="is-hidden">
+                <label class="block text-sm font-medium mb-1">Controllo Cutoff FFT (% Nyquist)
+                </label>
+                <input id="lpfCutoff" type="range" min="1" max="50" value="10" class="w-full" />
+                <div class="small">Cutoff % Nyquist:
+                    <span id="lpfCutoffLabel">10%
+                    </span>
+                </div>
+                <p class="small mt-2">Controlla la frequenza di taglio del filtro FFT.
+                </p>
+            </div>
+            <div></div>
+        </div>
+        
+        <div class="mt-4 flex gap-3">
+            <button id="processButton" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700" disabled>Elabora & Genera Report
+            </button>
+            <button id="zeroingButton" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700" disabled>Applica Compensazione G (FIT?)
+            </button>
+        </div>
+        
+        <section id="chartsSection" class="is-hidden">
+            <div class="chart-container card">
+                <h3 class="text-lg font-medium mb-2">Accelerazioni (X, Y, Z)
+                    <span id="accUnitLabel" class="small">(m/s²)
+                    </span>
+                </h3>
+                <canvas id="accelChart" width="800" height="320">
+                </canvas>
+            </div>
+            <div class="chart-container card">
+                <h3 class="text-lg font-medium mb-2">Velocità (X, Y, Z)
+                    <span id="velUnitLabel" class="small">(m/s)
+                    </span>
+                </h3>
+                <canvas id="velocityChart" width="800" height="320">
+                </canvas>
+            </div>
+            <div class="chart-container card">
+                <h3 class="text-lg font-medium mb-2">Spostamento (X, Y, Z)
+                    <span id="dispUnitLabel" class="small">(m)
+                    </span>
+                </h3>
+                <canvas id="displacementChart" width="800" height="320">
+                </canvas>
+            </div>
+        </section>
+        
+        <section id="reportSection" class="card is-hidden mb-6">
+            <h2 class="text-lg font-semibold">Riepilogo Elaborazione</h2>
+            <div class="mt-2 small">
+                <p><strong>Nome file:</strong>
+                    <span id="reportFileName">N/A
+                    </span>
+                </p>
+                <p><strong>Data/ora elaborazione:</strong>
+                    <span id="reportDate">N/A
+                    </span>
+                </p>
+                <p><strong>Sampling Rate:</strong>
+                    <span id="reportSampling">N/A
+                    </span>
+                </p>
+                <p><strong>Offset applicato:</strong>
+                    <span id="reportZero">NO
+                    </span>
+                </p>
+            </div>
+            <div id="report-content" class="mt-3 small">
+                </div>
+        </section>
+        
+        <section id="exportPrintSection" class="mt-4 flex justify-center gap-3">
+            <button id="exportButton" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700" disabled>Esporta Dati (.csv)
+            </button>
+            <button id="printButton" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">Stampa Report
+            </button>
+        </section>
+        
+        <footer class="small mt-6">
+            <p>⚠️ Disclaimer: Lo strumento è a scopo didattico. I risultati dipendono dal sensore, posizionamento e condizioni di misura.
+            </p>
+            
+            <div class="text-center text-gray-500 mt-4">
+                <p class="mb-2">
+                    Shaped With ❤️ by 
+                    <span style="position: relative; display: inline-block;">
+                        <span aria-hidden="true">S͓͎̻͕̥͓̘͑̔̇̄̍͂̏̃͜t̴̲̟̖͖̰̀͒̈́̉ű͔͉͙̯̝ͭ̅ͣl̡͎̥͖̼̱̐̅́ͫ́͡͡t̶̯̫̼̜̩͚̤̜̆̏ͬ͂ͩ͗͛̈́ư̢͔̮̜̞̝̂̉ͮ͊ͮͤ́Ƨ̨̞͇̜̬̦̺ͨ̊́̽̾͛ͦͅ</span>
+                        S͓͎̻͕̥͓̘͑̔̇̄̍͂̏̃͜t̴̲̟̖͖̰̀͒̈́̉ű͔͉͙̯̝ͭ̅ͣl̡͎̥͖̼̱̐̅́ͫ́͡͡t̶̯̫̼̜̩͚̤̜̆̏ͬ͂ͩ͗͛̈́ư̢͔̮̜̞̝̂̉ͮ͊ͮͤ́Ƨ̨̞͇̜̬̦̺ͨ̊́̽̾͛ͦͅ
+                    </span>
+                    © 2025
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+/* =========================
+   Global state and configs
+   ========================= */
+const state = {
+  unitSelected: false,
+  decimationPresetSelected: false,
+  delimiterOverride: null,
+  rawData: [],            // array of {Time, AccX, AccY, AccZ, [Absolute], ...}
+  processedData: [],
+  samplingRate: 0,
+  metadata: {},
+  zeroApplied: false, // ORA CONTROLLA IL "FIT?"
+  N_OFFSET_POINTS: 50,
+  maxPointsRender: 20000,
+  codeVersion: "1.0.0"
+};
+// Helper: select element
+const $ = id => document.getElementById(id);
+// UI elements
+const unitSelector = $('unitSelector');
+const decimationSelector = $('decimationSelector');
+const delimiterSelector = $('delimiterSelector');
+const filterTypeSelector = $('filterTypeSelector');
+const csvFileInput = $('csvFile');
+const statusLine = $('statusLine');
+const processButton = $('processButton');
+const exportButton = $('exportButton');
+const zeroingButton = $('zeroingButton');
+const analysisDetails = $('analysisDetails');
+const lpfCutoff = $('lpfCutoff');
+const lpfCutoffLabel = $('lpfCutoffLabel');
+const nyquistCursorSection = $('nyquistCursorSection');
+const samplingRateDisplay = $('samplingRateDisplay');
+const rawCountDisplay = $('rawCountDisplay');
+const decimatedPointsDisplay = $('decimatedPointsDisplay');
+/* =========================
+   UI State Management
+   ========================= */
+function setStatus(text, isError=false) {
+  statusLine.textContent = text;
+  statusLine.classList.toggle('text-red-600', isError);
+  statusLine.classList.toggle('text-green-600', !isError);
+}
+function enableFileInputIfReady() {
+  if (unitSelector.value && decimationSelector.value && filterTypeSelector.value) {
+    csvFileInput.disabled = false;
+    setStatus("Pronto. Ora puoi caricare il CSV.", false);
+  } else {
+    csvFileInput.disabled = true;
+    setStatus("Seleziona unità, decimazione e tipo di filtro prima del caricamento.", true);
+  }
+}
+/* =========================
+   Numeric normalization
+   ========================= */
+function normalizeNumberString(s, assumedDecimal=null) {
+  if (s === null || s === undefined) return NaN;
+  s = String(s).trim();
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1).trim();
+  }
+  s = s.replace(/\u00A0/g, '').replace(/\s+/g, '');
+  if (s === '') return NaN;
+  if (assumedDecimal === null) {
+    if (s.indexOf(',') !== -1 && s.indexOf('.') === -1) assumedDecimal = ',';
+    else {
+      const lastComma = s.lastIndexOf(',');
+      const lastDot = s.lastIndexOf('.');
+      assumedDecimal = (lastComma > lastDot) ? ',' : '.';
+    }
+  }
+  if (assumedDecimal === ',') {
+    if (s.indexOf('.') !== -1 && s.indexOf(',') !== -1) s = s.replace(/\./g, '');
+    s = s.replace(/,/g, '.');
+  } else {
+    if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1 && s.indexOf(',') < s.indexOf('.')) s = s.replace(/,/g, '');
+    else if (s.indexOf(',') !== -1 && s.indexOf('.') === -1) s = s.replace(/,/g, ''); 
+  }
+  const v = parseFloat(s);
+  return isFinite(v) ? v : NaN;
+}
+/* =========================
+   Header normalization & mapping
+   ========================= */
+function normalizeHeader(h) {
+  if (!h) return '';
+  let s = String(h).trim().toLowerCase();
+  s = s.replace(/\(.*?\)/g, '');
+  s = s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  s = s.replace(/[^a-z0-9]+/g, '_');
+  s = s.replace(/^_+|_+$/g, '');
+  return s;
+}
+const headerAliases = {
+  time: ['time', 'tempo', 'time_s', 'time_sec', 'time_s_'],
+  accx: ['acceleration_x','acc_x','accx','acceleration_x_','acceleration_x_m_s_2','acceleration_x_ms2'],
+  accy: ['acceleration_y','acc_y','accy','acceleration_y_','acceleration_y_m_s_2'],
+  accz: ['acceleration_z','acc_z','accz','acceleration_z_','acceleration_z_m_s_2'],
+  absacc: ['absolute_acceleration','acc_abs','acceleration_magnitude','absolute_acceleration_m_s_2'],
+  velocity: ['velocity','speed','vel','absolute_velocity']
+};
+function mapHeaderKey(norm) {
+  if (!norm) return null;
+  for (const k in headerAliases) {
+    for (const alias of headerAliases[k]) {
+      if (norm === alias || norm.startsWith(alias)) return k;
+    }
+  }
+  if (norm.includes('time')) return 'time';
+  if (norm.includes('acc') && norm.includes('x')) return 'accx';
+  if (norm.includes('acc') && norm.includes('y')) return 'accy';
+  if (norm.includes('acc') && norm.includes('z')) return 'accz';
+  if (norm.includes('absolute') || norm.includes('magnitude')) return 'absacc';
+  if (norm.includes('vel') || norm.includes('speed')) return 'velocity';
+  return null;
+}
+/* =========================
+   Delimiter detection
+   ========================= */
+function detectDelimiter(sampleText) {
+  const candidates = [';', '\t', ',', '|'];
+  const lines = sampleText.split(/\r\n|\n|\r/).filter(Boolean).slice(0, 10);
+  let best = { delim: ';', score: -1 };
+  for (const d of candidates) {
+    const counts = lines.map(l => l.split(d).length);
+    const variance = counts.reduce((a,b)=>a+Math.pow(b - (counts[0]||0),2),0);
+    const avg = counts.reduce((a,b)=>a+b,0)/counts.length;
+    const score = (avg > 1 ? avg : 0) - variance*0.1;
+    if (score > best.score) { best = { delim: d, score }; }
+  }
+  return best.delim;
+}
+/* =========================
+   Parser: handleFile (streaming)
+   ========================= */
+async function handleFile(file) {
+  return new Promise((resolve) => {
+    if (!file) { setStatus("Nessun file selezionato.", true); resolve(false); return; }
+    // reset state
+    state.rawData = [];
+    state.processedData = [];
+    state.samplingRate = 0;
+    state.metadata = { fileName: file.name, fileLastModified: file.lastModified, codeVersion: state.codeVersion, parsingWarnings: [] };
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const text = e.target.result;
+      let delim = delimiterSelector.value || null;
+      if (!delim) {
+        delim = detectDelimiter(text);
+        state.metadata.delimiterDetected = delim;
+      } else {
+        state.metadata.delimiterDetected = delim;
+      }
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        delimiter: delim,
+        preview: 0, 
+        transformHeader: h => normalizeHeader(h),
+        worker: false, 
+chunk: function(results, parser) {
+  for (const row of results.data) {
+    const mapped = {};
+    for (const rawKey in row) {
+      const norm = normalizeHeader(rawKey);
+      const tag = mapHeaderKey(norm);
+      if (tag) mapped[tag] = row[rawKey];
+      else mapped[rawKey] = row[rawKey];
+    }
+    const tRaw = mapped.time ?? mapped.Time ?? mapped['Time'];
+    const axRaw = mapped.accx ?? mapped.acc_x ?? mapped['acc_x'];
+    const ayRaw = mapped.accy ?? mapped.acc_y ?? mapped['acc_y'];
+    const azRaw = mapped.accz ?? mapped.acc_z ?? mapped['acc_z'];
+    const absRaw = mapped.absacc ?? mapped.absolute_acceleration ?? mapped.abs_acc;
+    const t = normalizeNumberString(tRaw);
+    const ax = normalizeNumberString(axRaw);
+    const ay = normalizeNumberString(ayRaw);
+    const az = normalizeNumberString(azRaw);
+    const absacc = absRaw !== undefined ? normalizeNumberString(absRaw) : NaN;
+    if (!isFinite(t) || !isFinite(ax) || !isFinite(ay) || !isFinite(az)) {
+      state.metadata.parsingWarnings.push({ row: state.rawData.length+1, reason: 'non-numeric or missing fields' });
+      continue;
+    }
+    state.rawData.push({ Time: t, AccX: ax, AccY: ay, AccZ: az, Absolute: isFinite(absacc) ? absacc : undefined });
+  }
+  if (rawCountDisplay) rawCountDisplay.textContent = state.rawData.length;
+  if (decimatedPointsDisplay) decimatedPointsDisplay.textContent = state.rawData.length;
+  if (state.rawData.length > 200000) {
+    parser.abort();
+    state.metadata.parsingWarnings.push('aborted: too many rows (>200k)');
+    setStatus('Parsing interrotto: file troppo grande per il client.', true);
+    resolve(false);
+    return;
+  }
+},        
+complete: function() {
+          if (state.rawData.length < 2) {
+            setStatus('File non valido o nessun dato utile rilevato.', true);
+            resolve(false);
+            return;
+          }
+          state.rawData.sort((a,b) => a.Time - b.Time);
+          state.metadata.rowsValid = state.rawData.length;
+          calcSamplingRate(state.rawData);
+          analysisDetails.classList.remove('is-hidden');
+          processButton.disabled = false;
+          zeroingButton.disabled = false;
+          exportButton.disabled = false;
+          
+          // MODIFICA: Blocca i selettori del "percorso obbligato"
+          unitSelector.disabled = true;
+          decimationSelector.disabled = true;
+          filterTypeSelector.disabled = true;
+          delimiterSelector.disabled = true;
+
+          if (filterTypeSelector.value === 'fft') {
+            lpfCutoff.disabled = false;
+          }
+          decimatedPointsDisplay.textContent = state.rawData.length; 
+          setStatus('Parsing completato. Premi "Elabora" per generare il report.', false);
+          resolve(true);
+        },
+        error: function(err) {
+          console.error('PapaParse error', err);
+          setStatus('Errore parsing CSV: ' + (err && err.message ? err.message : 'unknown'), true);
+          resolve(false);
+        }
+      });
+    }; 
+    const chunkSize = 64 * 1024;
+    const blob = file.slice(0, chunkSize);
+    reader.readAsText(blob);
+  });
+}
+
+/* =========================
+   calcSamplingRate
+   ========================= */
+function calcSamplingRate(data) {
+  if (!Array.isArray(data) || data.length < 2) {
+    state.samplingRate = 0;
+    if (typeof samplingRateDisplay !== 'undefined' && samplingRateDisplay) samplingRateDisplay.textContent = '0';
+    return 0;
+  }
+  const dts = [];
+  for (let i = 1; i < data.length; i++) {
+    const dt = data[i].Time - data[i-1].Time;
+    if (isFinite(dt) && dt > 0) dts.push(dt);
+  }
+  let medianDt = 0;
+  if (dts.length > 0) {
+    dts.sort((a,b)=>a-b);
+    const mid = Math.floor(dts.length/2);
+    medianDt = (dts.length % 2) ? dts[mid] : (dts[mid-1]+dts[mid])/2;
+  } else {
+    const t0 = data[0].Time;
+    const tN = data[data.length-1].Time;
+    const dtTotal = tN - t0;
+    medianDt = (dtTotal > 0) ? (dtTotal / (data.length - 1)) : 0;
+  }
+  state.samplingRate = (medianDt > 0) ? (1 / medianDt) : 0;
+  if (typeof samplingRateDisplay !== 'undefined' && samplingRateDisplay) samplingRateDisplay.textContent = state.samplingRate.toFixed(2);
+  return state.samplingRate;
+}
+/* =========================
+   Event bindings
+   ========================= */
+unitSelector.addEventListener('change', enableFileInputIfReady);
+decimationSelector.addEventListener('change', enableFileInputIfReady);
+delimiterSelector.addEventListener('change', () => { /* user override */ });
+
+filterTypeSelector.addEventListener('change', () => {
+    enableFileInputIfReady();
+    if (filterTypeSelector.value === 'fft') {
+        nyquistCursorSection.classList.remove('is-hidden');
+        lpfCutoff.disabled = (state.rawData.length === 0); // Abilita solo se i dati sono caricati
+    } else {
+        nyquistCursorSection.classList.add('is-hidden');
+        lpfCutoff.disabled = true; 
+    }
+});
+
+// MODIFICA: Il cursore ora è dinamico e richiama il ricalcolo
+lpfCutoff.addEventListener('input', () => {
+    if (lpfCutoffLabel) lpfCutoffLabel.textContent = lpfCutoff.value + '%';
+    // Se i dati sono già caricati, forza il ricalcolo
+    if (state.processedData.length > 0) {
+        processAndDisplayData();
+    }
+});
+
+csvFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  handleFile(file).then(success => {
+    if (!success) { /* errore gestito in handleFile */ }
+  });
+});
+
+// MODIFICA: Il pulsante Zeroing ora è dinamico e richiama il ricalcolo
+zeroingButton.addEventListener('click', () => {
+  state.zeroApplied = !state.zeroApplied;
+  zeroingButton.textContent = state.zeroApplied ? 'Rimuovi Compensazione G (FIT?)' : 'Applica Compensazione G (FIT?)';
+  // Se i dati sono già caricati, forza il ricalcolo
+  if (state.rawData.length > 0) {
+      processAndDisplayData();
+  }
+});
+
+/* Dark mode toggle */
+$('darkToggle').addEventListener('click', () => {
+  document.body.classList.toggle('dark-mode');
+});
+</script>
+<script>
+/* =========================
+   MOTORE DI CALCOLO (Rev 7 - "FIT?" è l'Offset)
+   ========================= */
+function mean(arr) {
+  if (!arr || !arr.length) return 0;
+  const sum = arr.reduce((a,b) => a + (isNaN(b) ? 0 : b), 0);
+  return sum / arr.length || 0;
+}
+function median(arr) {
+  if (!arr || !arr.length) return 0;
+  const s = arr.filter(v => !isNaN(v)).sort((a,b)=>a-b);
+  if (s.length === 0) return 0;
+  const mid = Math.floor(s.length/2);
+  return s.length % 2 ? s[mid] : (s[mid-1] + s[mid]) / 2;
+}
+
+function getStats(arr) {
+    const n = arr.length;
+    if (n === 0) return { min: 0, max: 0, mean: 0, variance: 0, stdDev: 0, slope: 0 };
+    let sum = 0, sumSq = 0, sumX = 0, sumY = 0, sumXY = 0, sumXSq = 0; 
+    let min = Infinity, max = -Infinity; 
+    let validCount = 0;
+
+    for (let i = 0; i < n; i++) {
+        const val = arr[i];
+        if (isNaN(val)) continue; 
+        
+        validCount++;
+        if (val < min) min = val;
+        if (val > max) max = val;
+        sum += val;
+        sumSq += val * val;
+        
+        sumX += i;
+        sumY += val;
+        sumXY += i * val;
+        sumXSq += i * i; 
+    }
+    if (min === Infinity) min = 0; 
+    if (max === -Infinity) max = 0;
+    
+    const mean = validCount > 0 ? sum / validCount : 0;
+    const variance = validCount > 0 ? (sumSq / validCount) - (mean * mean) : 0;
+    const stdDev = Math.sqrt(variance);
+    
+    const denominator = (validCount * sumXSq - (sumX * sumX));
+    const slope = denominator === 0 ? 0 : (validCount * sumXY - sumX * sumY) / denominator;
+
+    return { min, max, mean, variance, stdDev, slope: isNaN(slope) ? 0 : slope };
+}
+
+/* =========================
+   1. Logica "FIT?" (Detrending Avanzato)
+   ========================= */
+
+// MODIFICA: findPeaks ora trova sia massimi che minimi
+function findPeaks(arr) {
+  const peaks = [];
+  if (!arr || arr.length < 3) return peaks;
+  // Trova massimi locali
+  for (let i=1;i<arr.length-1;i++) {
+      if (arr[i] > arr[i-1] && arr[i] > arr[i+1]) {
+        peaks.push({ index: i, value: arr[i] });
+      }
+  }
+  // Trova minimi locali
+  for (let i=1;i<arr.length-1;i++) {
+      if (arr[i] < arr[i-1] && arr[i] < arr[i+1]) {
+        peaks.push({ index: i, value: arr[i] });
+      }
+  }
+  return peaks;
+}
+
+// NUOVA: Calcola la linea "FIT?"
+function linearRegression(peaks) {
+    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    const n = peaks.length;
+    if (n < 2) return { slope: 0, intercept: 0 }; 
+
+    for (const p of peaks) {
+        sumX += p.index;
+        sumY += p.value;
+        sumXY += p.index * p.value;
+        sumXX += p.index * p.index;
+    }
+
+    const denominator = (n * sumXX - sumX * sumX);
+    if (denominator === 0) return { slope: 0, intercept: mean(peaks.map(p => p.value)) }; // Linea piatta
+    
+    const slope = (n * sumXY - sumX * sumY) / denominator;
+    const intercept = (sumY - slope * sumX) / n;
+    
+    return { slope: isNaN(slope) ? 0 : slope, intercept: isNaN(intercept) ? 0 : intercept };
+}
+
+// NUOVA: Applica il detrending "FIT?"
+function applyAdvancedDetrending(data) {
+    // Prima calcola e rimuovi l'offset "Point 0" (come da tua logica)
+    const M = Math.min(Math.max(50, Math.floor(0.05 * data.length)), data.length);
+    if (M < 2) return data.map(d => ({...d})); // Troppo corto, restituisci copia
+    
+    const bx = mean(data.slice(0, M).map(d => d.AccX));
+    const by = mean(data.slice(0, M).map(d => d.AccY));
+    const bz = mean(data.slice(0, M).map(d => d.AccZ));
+    
+    if ($('gravityOffsetDisplay')) $('gravityOffsetDisplay').textContent = bz.toFixed(4);
+
+    const compensated = data.map(d => ({
+        ...d, // Copia tutto (incluso Time, Absolute)
+        AccX: d.AccX - bx,
+        AccY: d.AccY - by,
+        AccZ: d.AccZ - bz
+    }));
+
+    // Ora applica il "FIT?" sui dati già compensati
+    const detrended = compensated.map(d => ({ ...d })); 
+    
+    ['AccX','AccY','AccZ'].forEach(axis => {
+        const arr = compensated.map(d => d[axis]);
+        const peaks = findPeaks(arr);
+        
+        if (peaks.length < 2) {
+             // Non abbastanza picchi per un fit, usa la media (detrend semplice)
+            const meanVal = getStats(arr).mean;
+            for (let i = 0; i < detrended.length; i++) {
+                detrended[i][axis] = detrended[i][axis] - meanVal;
+            }
+        } else {
+            // Applica il "FIT?"
+            const fit = linearRegression(peaks);
+            for (let i = 0; i < detrended.length; i++) {
+                const drift = fit.slope * i + fit.intercept;
+                detrended[i][axis] = detrended[i][axis] - drift;
+            }
+        }
+    });
+    return detrended;
+}
+
+/* =========================
+   2. Filtri (LPF / FFT)
+   ========================= */
+function decimateData(data, factor=1) {
+  if (factor <= 1) return data.slice();
+  const dec = [];
+  for (let i=0;i<data.length;i+=factor) dec.push(data[i]);
+  return dec;
+}
+function lowPassMovingAverage(data, windowSize=5) {
+  if (!data || data.length === 0) return data;
+  if (windowSize <= 1) return data.slice();
+  const out = data.map(d=>({ ...d })); // Copia
+  ['AccX','AccY','AccZ'].forEach(axis=>{
+    const arr = data.map(d=>d[axis]);
+    const smoothed = [];
+    for (let i=0;i<arr.length;i++) {
+      const start = Math.max(0, i - Math.floor(windowSize/2));
+      const end = Math.min(arr.length, i + Math.ceil(windowSize/2));
+      let sum = 0;
+      for (let j = start; j < end; j++) {
+          sum += arr[j];
+      }
+      smoothed.push(sum / (end - start));
+    }
+    for (let i=0; i<smoothed.length; i++) {
+        out[i][axis] = smoothed[i];
+    }
+  });
+  return out;
+}
+function fourierFilterSimple(data, cutoffHz=10) {
+  const FFTCtor = (typeof FFT !== 'undefined') ? FFT : (window && (window.FFT || window.fft || window.fftjs)) || null;
+  if (!FFTCtor) {
+    state.metadata.fftError = state.metadata.fftError || [];
+    state.metadata.fftError.push('FFT library non disponibile');
+    setStatus('Lib FFT non caricata: filtro FFT disabilitato (usa LPF o carica fft.js)', true);
+    return data;
+  }
+  if (!data || data.length < 2) return data;
+  const n = data.length;
+  const Fs = state.samplingRate || 1;
+  if (Fs <= 0) return data;
+  function nextPowerOfTwo(v){ let p=1; while(p<v) p <<= 1; return p; }
+  const Nfft = nextPowerOfTwo(n);
+  const fft = new FFTCtor(Nfft);
+  const filtered = data.map(d=>({ ...d })); // Copia
+  ['AccX','AccY','AccZ'].forEach(axis=>{
+    const input = new Array(Nfft).fill(0);
+    for (let i=0;i<n;i++) input[i] = data[i][axis] || 0;
+    try {
+      const spectrum = fft.createComplexArray();
+      fft.realTransform(spectrum, input);
+      fft.completeSpectrum && fft.completeSpectrum(spectrum); 
+      const cutoffBin = Math.floor(cutoffHz * Nfft / Fs);
+      const half = Math.floor(Nfft/2);
+      for (let b = 0; b <= half; b++) {
+        if (b > cutoffBin) {
+          const idx = b * 2;
+          if (idx < spectrum.length) {
+            spectrum[idx] = 0;
+            spectrum[idx+1] = 0;
+          }
+          const sym = (Nfft - b);
+          if (sym !== b && (sym <= Nfft && sym*2 < spectrum.length)) {
+            const idx2 = sym * 2;
+            spectrum[idx2] = 0;
+            spectrum[idx2+1] = 0;
+          }
+        }
+      }
+      if (typeof fft.inverseTransform !== 'function') {
+        setStatus('API inverseTransform FFT non disponibile nella libreria caricata', true);
+        return; 
+      }
+      const outSignal = fft.inverseTransform(spectrum);
+      for (let i=0;i<n;i++) {
+        filtered[i][axis] = outSignal[i];
+      }
+    } catch (err) {
+      console.error('FFT processing error', err);
+      setStatus('Errore esecuzione FFT: filtro disabilitato', true);
+    }
+  });
+  return filtered;
+}
+
+/* =========================
+   3. Integrazione (Semplificata)
+   ========================= */
+function integrateData(data) { // Non fa più detrending
+  const N = data.length;
+  if (N < 2 || !state.samplingRate) {
+    return {
+      velocityX: Array(N).fill(0), displacementX: Array(N).fill(0),
+      velocityY: Array(N).fill(0), displacementY: Array(N).fill(0),
+      velocityZ: Array(N).fill(0), displacementZ: Array(N).fill(0)
+    };
+  }
+  const dt = 1 / state.samplingRate;
+  
+  const results = {};
+  ['AccX','AccY','AccZ'].forEach(axis=>{
+    const acc = data.map(d => d[axis]);
+    const vel = [0];
+    for (let i=1;i<acc.length;i++) {
+      const aavg = (acc[i] + acc[i-1]) / 2;
+      vel.push( vel[i-1] + aavg * dt );
+    }
+    
+    // Rimosso detrending velocità
+    
+    const disp = [0];
+    for (let i=1;i<vel.length;i++) { 
+      const vavg = (vel[i] + vel[i-1]) / 2;
+      disp.push( disp[i-1] + vavg * dt );
+    }
+    const ax = axis.slice(-1); // X/Y/Z
+    results['velocity' + ax] = vel; 
+    results['displacement' + ax] = disp;
+  });
+  return results;
+}
+
+/* =========================
+   Chart drawing (basic)
+   ========================= */
+let charts = { acc: null, vel: null, disp: null, incl: null }; // Definizione esplicita
+function destroyCharts() {
+  if (charts.acc) { charts.acc.destroy(); charts.acc = null; }
+  if (charts.vel) { charts.vel.destroy(); charts.vel = null; }
+  if (charts.disp) { charts.disp.destroy(); charts.disp = null; }
+  if (charts.incl) { charts.incl.destroy(); charts.incl = null; }
+}
+function drawCharts(processed, results) {
+  destroyCharts(); // Pulisce TUTTO (incl. incl)
+  if (!processed || processed.length === 0) return;
+  
+  const N = processed.length;
+  const maxPlot = Math.min(state.maxPointsRender || 5000, 5000); 
+  const step = Math.max(1, Math.ceil(N / maxPlot));
+  
+  const sampledIndices = [];
+  for (let i = 0; i < N; i += step) {
+    sampledIndices.push(i);
+  }
+
+  const labels = sampledIndices.map(i => processed[i].Time.toFixed(3));
+  
+  const sample = (arr) => sampledIndices.map(i => (arr && arr[i] !== undefined) ? arr[i] : null);
+
+  const accX = sample(processed.map(d => d.AccX));
+  const accY = sample(processed.map(d => d.AccY));
+  const accZ = sample(processed.map(d => d.AccZ));
+  
+  const velX = sample(results.velocityX);
+  const velY = sample(results.velocityY);
+  const velZ = sample(results.velocityZ);
+
+  const unit = unitSelector.value || 'm';
+  const conv = unitConversionFactorToDisplay(unit);
+  const dispX = sample(results.displacementX).map(v => v * conv);
+  const dispY = sample(results.displacementY).map(v => v * conv);
+  const dispZ = sample(results.displacementZ).map(v => v * conv);
+
+  // Accelerations
+  const ctxA = document.getElementById('accelChart').getContext('2d');
+  charts.acc = new Chart(ctxA, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: `AccX (m/s²)`, data: accX, borderColor: 'red', pointRadius: 0 },
+        { label: `AccY (m/s²)`, data: accY, borderColor: 'green', pointRadius: 0 },
+        { label: `AccZ (m/s²)`, data: accZ, borderColor: 'blue', pointRadius: 0 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, animation: false, spanGaps: true, plugins: { annotation: { annotations: {} } } } 
+  });
+  // Velocity
+  const ctxV = document.getElementById('velocityChart').getContext('2d');
+  charts.vel = new Chart(ctxV, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: `VelX (m/s)`, data: velX, borderColor:'red', pointRadius:0 },
+        { label: `VelY (m/s)`, data: velY, borderColor:'green', pointRadius:0 },
+        { label: `VelZ (m/s)`, data: velZ, borderColor:'blue', pointRadius:0 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, animation: false, spanGaps: true, plugins: { annotation: { annotations: {} } } }
+  });
+  // Displacement
+  const ctxD = document.getElementById('displacementChart').getContext('2d');
+  charts.disp = new Chart(ctxD, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: `DispX (${unit})`, data: dispX, borderColor:'red', pointRadius:0 },
+        { label: `DispY (${unit})`, data: dispY, borderColor:'green', pointRadius:0 },
+        { label: `DispZ (${unit})`, data: dispZ, borderColor:'blue', pointRadius:0 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, animation: false, spanGaps: true, plugins: { annotation: { annotations: {} } } }
+  });
+}
+/* =========================
+   processAndDisplayData (Orchestratore)
+   ========================= */
+function processAndDisplayData() {
+  if (!state.rawData || state.rawData.length < 2) {
+    setStatus('Nessun dato raw disponibile. Carica un file.', true);
+    return;
+  }
+  
+  setStatus('Avvio ricalcolo...', false);
+  
+  // 1. Detrending "FIT?" (controllato da "Offset G")
+  let detrended;
+  if (state.zeroApplied) {
+      setStatus('Applico Detrending "FIT?"...', false);
+      detrended = applyAdvancedDetrending(state.rawData); 
+      if ($('reportZero')) $('reportZero').textContent = 'SÌ (FIT?)';
+  } else {
+      // Se NO, usa i dati raw (senza N-punti e senza FIT?)
+      detrended = state.rawData.map(d => ({ ...d })); // Copia
+      if ($('gravityOffsetDisplay')) $('gravityOffsetDisplay').textContent = '0 (Non applicato)';
+      if ($('reportZero')) $('reportZero').textContent = 'NO';
+  }
+  
+  // 2. Decimazione
+  const factor = parseInt(decimationSelector.value || '1');
+  const decimated = decimateData(detrended, factor);
+  state.metadata.decimationApplied = factor;
+  
+  // 3. Filtri
+  let filtered = decimated;
+  const filterType = filterTypeSelector.value;
+  state.metadata.filterType = filterType;
+
+  if (filterType === 'lpf') {
+    const win = 5; // Finestra fissa
+    filtered = lowPassMovingAverage(filtered, win);
+    state.metadata.lpf = { applied: true, window: win };
+  }
+  if (filterType === 'fft') {
+    const cutoffPercent = parseInt(lpfCutoff.value, 10);
+    const nyquist = state.samplingRate / 2;
+    const dynamicCutoffHz = (nyquist * cutoffPercent / 100) || 1; 
+    filtered = fourierFilterSimple(filtered, dynamicCutoffHz);
+    state.metadata.fft = { applied: true, cutoffHz: dynamicCutoffHz, cutoffPercent: cutoffPercent };
+  }
+  
+  state.processedData = filtered; // Salva i dati finali
+  
+  // 4. Integrazione
+  const integrationResults = integrateData(filtered);
+  
+  state.fullResults = {
+    velocity: { x: integrationResults.velocityX, y: integrationResults.velocityY, z: integrationResults.velocityZ },
+    displacement: { x: integrationResults.displacementX, y: integrationResults.displacementY, z: integrationResults.displacementZ }
+  };
+
+  // 5. Mostra i grafici
+  document.getElementById('chartsSection')?.classList.remove('is-hidden');
+  
+  // Nascondi tutti i grafici prima di decidere quali mostrare
+  $('accelChart').closest('.chart-container').classList.add('is-hidden');
+  $('velocityChart').closest('.chart-container').classList.add('is-hidden');
+  $('displacementChart').closest('.chart-container').classList.add('is-hidden');
+
+  drawCharts(filtered, {
+    velocityX: state.fullResults.velocity.x,
+    velocityY: state.fullResults.velocity.y,
+    velocityZ: state.fullResults.velocity.z,
+    displacementX: state.fullResults.displacement.x,
+    displacementY: state.fullResults.displacement.y,
+    displacementZ: state.fullResults.displacement.z
+  });
+  
+  // Decidi quali mostrare (default: Accel e Spostamento)
+  $('accelChart').closest('.chart-container').classList.remove('is-hidden');
+  $('displacementChart').closest('.chart-container').classList.remove('is-hidden');
+  // Resetta il titolo del grafico velocità (in caso fosse "Inclinazione")
+  try {
+      $('velocityChart').closest('.chart-container').querySelector('h3').innerHTML = 'Velocità (X, Y, Z) <span class="small">(m/s)</span>';
+  } catch(e) {}
+
+
+  setTimeout(() => {
+    try {
+      charts.acc?.resize(); 
+      charts.vel?.resize(); 
+      charts.disp?.resize(); 
+    } catch (e) {
+      console.warn('chart post-resize failed', e);
+    }
+  }, 40);
+  
+  // 6. Aggiorna UI/Report
+  if ($('reportFileName')) $('reportFileName').textContent = state.metadata.fileName || 'N/A';
+  if ($('reportDate')) $('reportDate').textContent = new Date().toLocaleString();
+  if ($('reportSampling')) $('reportSampling').textContent = (state.samplingRate || 0).toFixed(2);
+  $('reportSection')?.classList.remove('is-hidden');
+  
+  updateFullReport(); 
+  
+  setStatus('Elaborazione completata.', false);
+}
+</script>
+<script>
+/* =========================
+   Web Worker (Non usato per i calcoli principali, solo per "full processing" se ri-abilitato)
+   ========================= */
+const workerScript = `
+self.onmessage = function(e) {
+  const { cmd, data, params } = e.data;
+  if (cmd === 'processFull') {
+    try {
+      const raw = data; // array of {Time, AccX, AccY, AccZ}
+      const Fs = params.samplingRate || 1;
+      const N = raw.length;
+      
+      const dt = (Fs > 0) ? (1 / Fs) : 0;
+      
+      if (dt === 0) {
+        throw new Error("Invalid sampling rate (Fs=0) in worker.");
+      }
+
+      const result = { filtered: raw, velocity: null, displacement: null };
+      
+      const accX = raw.map(r=>r.AccX);
+      const accY = raw.map(r=>r.AccY);
+      const accZ = raw.map(r=>r.AccZ);
+      
+      // Funzione di integrazione (vecchia logica)
+      function integrateAxis(arr) {
+        const vel=[0];
+        for (let i=1;i<arr.length;i++) {
+          const aavg = (arr[i]+arr[i-1])/2;
+          vel.push(vel[i-1] + aavg * dt);
+        }
+        const meanVel = vel.length > 0 ? vel.reduce((a,b)=>a+b,0)/vel.length : 0;
+        const velDet = vel.map(v=>v-meanVel);
+        
+        const disp=[0];
+        for (let i=1;i<velDet.length;i++) {
+          const vavg = (velDet[i]+velDet[i-1])/2;
+          disp.push(disp[i-1] + vavg * dt);
+        }
+        return { vel: velDet, disp };
+      }
+      
+      const xRes = integrateAxis(accX);
+      const yRes = integrateAxis(accY);
+      const zRes = integrateAxis(accZ);
+      
+      result.velocity = { x: xRes.vel, y: yRes.vel, z: zRes.vel };
+      result.displacement = { x: xRes.disp, y: yRes.disp, z: zRes.disp };
+      
+      self.postMessage({ ok: true, result });
+    } catch (err) {
+      self.postMessage({ ok: false, error: err.message || String(err) });
+    }
+  }
+};
+`;
+const workerBlob = new Blob([workerScript], { type: 'application/javascript' });
+const workerUrl = URL.createObjectURL(workerBlob);
+
+let currentWorker = null;
+function runFullProcessingInWorker(params = {}) {
+  return new Promise((resolve, reject) => {
+    if (!state.rawData || state.rawData.length < 2) return reject(new Error('No data'));
+    if (currentWorker) {
+      currentWorker.terminate();
+      currentWorker = null;
+    }
+    const w = new Worker(workerUrl);
+    currentWorker = w;
+    
+    if (!state.processedData || state.processedData.length === 0) {
+        // Logica di fallback se processAndDisplayData non ha popolato processedData
+        state.processedData = state.rawData.map(d => ({...d}));
+    }
+
+    const payload = { cmd: 'processFull', data: state.processedData, params };
+    
+    w.onmessage = function(e) {
+      const msg = e.data;
+      if (msg.ok) {
+        state.metadata.fullProcessing = { timestamp: Date.now() };
+        resolve(msg.result);
+        w.terminate();
+        currentWorker = null;
+      } else {
+        reject(new Error(msg.error || 'worker error'));
+        w.terminate();
+        currentWorker = null;
+      }
+    };
+    w.onerror = function(ev) {
+      reject(ev.message || 'worker runtime error');
+      w.terminate();
+      currentWorker = null;
+    };
+    w.postMessage(payload);
+  });
+}
+/* =========================
+   Export CSV with metadata header
+   ========================= */
+function exportDerivedCSV() {
+  if (!state.processedData || state.processedData.length === 0) {
+    setStatus('Nessun dato elaborato da esportare', true);
+    return;
+  }
+  const results = state.fullResults || integrateData(state.processedData);
+  const headerLines = [];
+  headerLines.push('# Phyphox Converter Export');
+  headerLines.push('# metadata:' + JSON.stringify(state.metadata));
+  headerLines.push('# columns: Time;AccX;AccY;AccZ;VelX;VelY;VelZ;DispX;DispY;DispZ');
+  const rows = [headerLines.join('\n')];
+  rows.push('Time;AccX;AccY;AccZ;VelX;VelY;VelZ;DispX;DispY;DispZ');
+
+  const unit = unitSelector.value || 'm';
+  const conv = unitConversionFactorToDisplay(unit);
+
+  for (let i=0;i<state.processedData.length;i++) {
+    const p = state.processedData[i];
+    const vX = (results.velocity && results.velocity.x && results.velocity.x[i] !== undefined) ? results.velocity.x[i] : '';
+    const vY = (results.velocity && results.velocity.y && results.velocity.y[i] !== undefined) ? results.velocity.y[i] : '';
+    const vZ = (results.velocity && results.velocity.z && results.velocity.z[i] !== undefined) ? results.velocity.z[i] : '';
+    const dX = (results.displacement && results.displacement.x && results.displacement.x[i] !== undefined) ? (results.displacement.x[i] * conv) : '';
+    const dY = (results.displacement && results.displacement.y && results.displacement.y[i] !== undefined) ? (results.displacement.y[i] * conv) : '';
+    const dZ = (results.displacement && results.displacement.z && results.displacement.z[i] !== undefined) ? (results.displacement.z[i] * conv) : '';
+    
+    const line = [
+      p.Time,
+      p.AccX, p.AccY, p.AccZ,
+      vX, vY, vZ,
+      dX, dY, dZ
+    ].map(v => String(v).replace('.', ',')).join(';'); 
+    rows.push(line);
+  }
+  const csvContent = rows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (state.metadata.fileName ? state.metadata.fileName.replace(/\.[^.]+$/, '') : 'export') + `_derived_(${unit}).csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setStatus('CSV derivato scaricato', false);
+}
+/* =========================
+   EventDetector (MAD-based)
+   ========================= */
+function mad(arr) {
+  if (!arr || arr.length === 0) return 0;
+  const med = median(arr);
+  const dev = arr.map(v=>Math.abs(v - med));
+  return median(dev);
+}
+function detectEventsByMAD(series, timeArr, k=4, minDistanceSec=0.05) {
+  const events = [];
+  if (series.length === 0) return events;
+  
+  const medianVal = median(series);
+  const deviation = mad(series);
+  if (deviation === 0) return events; // Dati piatti
+  
+  const threshold = medianVal + k * deviation;
+  
+  let inEvent = false;
+  let current = null;
+  
+  for (let i=0;i<series.length;i++) {
+    if (!inEvent && Math.abs(series[i]) >= threshold) {
+      inEvent = true;
+      current = { start: timeArr[i], peak: timeArr[i], peakValue: series[i], indices: [i] };
+    } else if (inEvent) {
+      current.indices.push(i);
+      if (Math.abs(series[i]) > Math.abs(current.peakValue)) {
+        current.peakValue = series[i];
+        current.peak = timeArr[i];
+      }
+      if (Math.abs(series[i]) < threshold * 0.5) {
+        current.end = timeArr[i];
+        let area = 0;
+        const idxs = current.indices;
+        for (let j=1;j<idxs.length;j++) {
+          const a1 = series[idxs[j-1]], a2 = series[idxs[j]];
+          const dt = timeArr[idxs[j]] - timeArr[idxs[j-1]];
+          if (isFinite(dt) && dt > 0) {
+            area += (Math.abs(a1) + Math.abs(a2)) / 2 * dt;
+          }
+        }
+        current.area = area;
+        events.push(current);
+        inEvent = false;
+        current = null;
+      }
+    }
+  }
+  if (inEvent) {
+     current.end = timeArr[timeArr.length-1];
+     let area = 0;
+     const idxs = current.indices;
+     for (let j=1;j<idxs.length;j++) {
+       const a1 = series[idxs[j-1]], a2 = series[idxs[j]];
+       const dt = timeArr[idxs[j]] - timeArr[idxs[j-1]];
+       if (isFinite(dt) && dt > 0) {
+        area += (Math.abs(a1) + Math.abs(a2)) / 2 * dt;
+       }
+     }
+     current.area = area;
+     events.push(current);
+  }
+  return events;
+}
+/* =========================
+   Tests scaffold (small)
+   ========================= */
+function runQuickTests() {
+  const results = [];
+  results.push({ name: 'normalize 1', ok: normalizeNumberString('2.666E-1') === 0.2666 });
+  results.push({ name: 'normalize comma', ok: Math.abs(normalizeNumberString('1.234,56') - 1234.56) < 1e-6 });
+  const synth = [];
+  for (let i=0;i<100;i++) synth.push({Time: i/100, AccX: 0.1 + Math.random()*0.01, AccY:0, AccZ:9.81});
+  // Test sul rawData, non su applyCompensation
+  state.rawData = synth;
+  const b = applyAdvancedDetrending(state.rawData).map(d => d.AccX);
+  results.push({ name: 'advanced detrending', ok: Math.abs(mean(b)) < 0.02 });
+  console.table(results);
+  setStatus('Quick tests executed (check console)', false);
+}
+</script>
+<script>
+/* =========================
+   Integrate worker results and update UI
+   ========================= */
+function applyFullResultsToUI(fullRes) {
+  // QUESTA FUNZIONE È CHIAMATA SOLO SE SI USA IL WORKER
+  // Al momento, il pulsante "Elabora" NON usa il worker.
+  // Questa è una logica di fallback.
+  if (!fullRes) return;
+  state.fullResults = fullRes;
+  
+  const N = state.processedData.length;
+  if (fullRes.velocity.x.length !== N) {
+      console.warn("Disallineamento dati tra UI (processedData) e Worker (fullRes).");
+      // Usa i risultati del main thread che sono già in state.fullResults
+  } else {
+      // Popola i dati processati con i risultati del worker
+      const vX = fullRes.velocity.x || [];
+      const vY = fullRes.velocity.y || [];
+      const vZ = fullRes.velocity.z || [];
+      const dX = fullRes.displacement.x || [];
+      const dY = fullRes.displacement.y || [];
+      const dZ = fullRes.displacement.z || [];
+      
+      for (let i=0;i<N;i++) {
+        const p = state.processedData[i];
+        p.VelX = (vX[i] !== undefined) ? vX[i] : (p.VelX || 0);
+        p.VelY = (vY[i] !== undefined) ? vY[i] : (p.VelY || 0);
+        p.VelZ = (vZ[i] !== undefined) ? vZ[i] : (p.VelZ || 0);
+        p.DispX = (dX[i] !== undefined) ? dX[i] : (p.DispX || 0);
+        p.DispY = (dY[i] !== undefined) ? dY[i] : (p.DispY || 0);
+        p.DispZ = (dZ[i] !== undefined) ? dZ[i] : (p.DispZ || 0);
+      }
+      // Aggiorna state.fullResults con quelli del worker
+      state.fullResults = {
+          velocity: { x: vX, y: vY, z: vZ },
+          displacement: { x: dX, y: dY, z: dZ }
+      };
+  }
+  
+  const results = {
+    velocityX: state.fullResults.velocity.x, 
+    velocityY: state.fullResults.velocity.y, 
+    velocityZ: state.fullResults.velocity.z,
+    displacementX: state.fullResults.displacement.x, 
+    displacementY: state.fullResults.displacement.y, 
+    displacementZ: state.fullResults.displacement.z
+  };
+  
+  document.getElementById('chartsSection')?.classList.remove('is-hidden');
+  
+  drawCharts(state.processedData, results);
+  
+  const mag = state.processedData.map(p => Math.sqrt(p.AccX*p.AccX + p.AccY*p.AccY + p.AccZ*p.AccZ));
+  const times = state.processedData.map(p => p.Time);
+  const events = detectEventsByMAD(mag, times, 4, 0.02);
+  state.metadata.events = events;
+  
+  updateFullReport(events); 
+  
+  setStatus('Elaborazione completa (full) terminata', false);
+}
+
+/* =========================
+   Report Unificato (Rev 2 - Con Bug Fix Y/Z)
+   ========================= */
+function updateFullReport(events = []) {
+  const el = $('report-content'); 
+  if (!el) return;
+
+  // 1. Calcola Statistiche Spostamento
+  const disp = state.fullResults.displacement || {};
+  const unit = unitSelector.value || 'm';
+  const conv = unitConversionFactorToDisplay(unit);
+  
+  const dispX = (disp.x || []).map(v => v * conv);
+  const dispY = (disp.y || []).map(v => v * conv);
+  const dispZ = (disp.z || []).map(v => v * conv);
+
+  const statsX = getStats(dispX);
+  const statsY = getStats(dispY);
+  const statsZ = getStats(dispZ);
+
+  // 2. Calcola Statistiche Inclinazione
+  const { rolls, pitchs } = prepareOrientationAndConvertedDisplacement();
+  const meanRoll = mean(rolls || []);
+  const meanPitch = mean(pitchs || []);
+  
+  // 3. Calcola Media Accelerazione Assoluta (dal rawData)
+  const absValues = state.rawData.map(d => d.Absolute).filter(v => v !== undefined && !isNaN(v));
+  const meanAbs = absValues.length > 0 ? mean(absValues) : 0;
+
+  // 4. Costruisci HTML
+  let html = '<div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-left">'; 
+  
+  // Box Spostamento X
+  html += '<div class="p-2 border rounded bg-white dark:bg-gray-800">';
+  html += '<h4 class="font-semibold text-purple-700 dark:text-purple-400">Spostamento X (' + unit + ')</h4>';
+  html += '<p class="text-xs">Max X: ' + statsX.max.toFixed(3) + '</p>';
+  html += '<p class="text-xs">Min X: ' + statsX.min.toFixed(3) + '</p>';
+  html += '<p class="text-xs">Media X: ' + statsX.mean.toFixed(3) + '</p>';
+  html += '</div>';
+
+  // Box Spostamento Y/Z (CORRETTO)
+  html += '<div class="p-2 border rounded bg-white dark:bg-gray-800">';
+  html += '<h4 class="font-semibold text-purple-700 dark:text-purple-400">Spostamento Y/Z (' + unit + ')</h4>';
+  html += '<p class="text-xs">Max Y: ' + statsY.max.toFixed(3) + '</p>';
+  html += '<p class="text-xs">Min Y: ' + statsY.min.toFixed(3) + '</p>';
+  html += '<p class="text-xs">Media Y: ' + statsY.mean.toFixed(3) + '</p>';
+  html += '<hr class="my-1 border-gray-200 dark:border-gray-600">';
+  html += '<p class="text-xs">Max Z: ' + statsZ.max.toFixed(3) + '</p>';
+  html += '<p class="text-xs">Min Z: ' + statsZ.min.toFixed(3) + '</p>';
+  html += '<p class="text-xs">Media Z: ' + statsZ.mean.toFixed(3) + '</p>';
+  html += '</div>';
+
+  // Box Inclinazione e Assoluta
+  html += '<div class="p-2 border rounded bg-white dark:bg-gray-800">';
+  html += '<h4 class="font-semibold text-purple-700 dark:text-purple-400">Inclinazione (°)</h4>';
+  html += '<p class="text-xs">Media Roll: ' + meanRoll.toFixed(2) + '°</p>';
+  html += '<p class="text-xs">Media Pitch: ' + meanPitch.toFixed(2) + '°</p>';
+  html += '<hr class="my-1 border-gray-200 dark:border-gray-600">';
+  html += '<h4 class="font-semibold text-purple-700 dark:text-purple-400 mt-2">Acc. Assoluta (raw)</h4>';
+  html += '<p class="text-xs">Media: ' + meanAbs.toFixed(3) + ' m/s²</p>';
+  html += '</div>';
+  
+  // Box Eventi
+  html += '<div class="p-2 border rounded bg-white dark:bg-gray-800">';
+  html += '<h4 class="font-semibold text-purple-700 dark:text-purple-400">Eventi (Detrended Acc.)</h4>';
+  if (!events || events.length === 0) {
+    html += `<p class="text-xs">Nessun evento significativo rilevato.</p>`;
+  } else {
+    html += `<p class="text-xs"><strong>Eventi rilevati:</strong> ${events.length}</p><ul class="list-disc list-inside text-xs">`;
+    events.slice(0, 5).forEach((ev, idx) => { // Limita a 5 per UI
+      html += `<li>Peak ${ev.peakValue.toFixed(3)} @ ${ev.time.toFixed(3)}s</li>`;
+    });
+    html += '</ul>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+
+/* =========================
+   Chart annotation helper (mark peaks)
+   ========================= */
+function annotatePeaksOnChart(chartInstance, peaks) {
+  if (!chartInstance || !peaks) return; 
+  if (!Chart.registry.plugins.get('annotation')) {
+    console.warn('Plugin Annotazioni non registrato. Impossibile disegnare picchi.');
+    return;
+  }
+  
+  const ann = {};
+  if (peaks.length > 0) {
+      // Limita il numero di picchi disegnati per performance
+      const significantPeaks = peaks.sort((a,b) => Math.abs(b.value) - Math.abs(a.value)).slice(0, 50);
+      
+      significantPeaks.forEach((p, idx) => {
+        // Cerca il tempo corretto dall'array dei dati processati
+        const timeValue = (state.processedData[p.index]) ? state.processedData[p.index].Time.toFixed(3) : 0;
+        ann['peak_' + idx] = {
+          type: 'line',
+          scaleID: 'x',
+          value: timeValue,
+          borderColor: p.color || 'orange', // Usa il colore passato
+          borderWidth: 1,
+          label: { 
+            content: `${p.value.toFixed(3)}`, 
+            enabled: true, 
+            position: 'start',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            color: p.color || 'orange',
+            font: { size: 10 }
+          }
+        };
+      });
+  }
+  
+  if (!chartInstance.options.plugins) chartInstance.options.plugins = {};
+  chartInstance.options.plugins.annotation = { annotations: ann };
+  chartInstance.update();
+}
+/* =========================
+   Hook process button to run full worker and update
+   ========================= */
+processButton.addEventListener('click', async () => {
+  try {
+    setStatus('Avvio elaborazione (Main Thread)...', false);
+    
+    // 1. Esegui la pipeline di preview (che ora è la pipeline principale)
+    processAndDisplayData();
+
+    // 2. Il Worker non è più usato per il ricalcolo
+    // const params = { samplingRate: state.samplingRate };
+    // const fullRes = await runFullProcessingInWorker(params);
+    // applyFullResultsToUI(fullRes);
+
+    setStatus('Elaborazione completata (Main Thread).', false);
+
+  } catch (err) {
+    console.error(err);
+    setStatus('Errore durante elaborazione completa: ' + (err.message || err), true);
+  }
+});
+/* =========================
+   Attach export / print bindings
+   ========================= */
+$('printButton').addEventListener('click', () => {
+  window.print();
+});
+
+$('exportButton').addEventListener('click', () => {
+  exportDerivedCSV();
+});
+/* =========================
+   Final UI initializers
+   ========================= */
+document.addEventListener('DOMContentLoaded', () => {
+  enableFileInputIfReady();
+  setStatus('Pronto. Seleziona unità, decimazione e tipo di filtro per iniziare.', false);
+});
+</script>
+<script>
+/* =========================
+   Quick test runner UI (optional)
+   ========================= */
+(function injectTestButton(){
+  const btn = document.createElement('button');
+  btn.textContent = 'Esegui Quick Tests';
+  btn.className = 'px-3 py-1 bg-slate-300 dark:bg-slate-700 rounded ml-2';
+  btn.onclick = runQuickTests;
+  const targetDiv = document.createElement('div');
+  targetDiv.className = 'md:col-span-4 mt-2'; // 4 colonne
+  targetDiv.appendChild(btn);
+  document.querySelector('#controlsCard .grid')?.appendChild(targetDiv);
+})();
+/* =========================
+   Synthetic datasets (for local tests)
+   ========================= */
+const samplePhyphoxExcerpt = [
+  { Time: 0.2666496660, AccX: 0.1244984865, AccY: -0.05506663769, AccZ: 9.847650528, Absolute: 9.848591429 },
+  { Time: 0.2686586660, AccX: 0.1197100878, AccY: -0.04788403213, AccZ: 9.859622002, Absolute: 9.860464969 },
+  { Time: 0.2706686660, AccX: 0.1173158810, AccY: -0.05027823523, AccZ: 9.862015724, Absolute: 9.862841632 },
+  { Time: 0.2726776660, AccX: 0.1244984865, AccY: -0.05027823523, AccZ: 9.852438927, Absolute: 9.853353773 },
+  { Time: 0.2746866660, AccX: 0.1340752989, AccY: -0.05506663769, AccZ: 9.847650528, Absolute: 9.848717147 },
+  { Time: 0.2766956660, AccX: 0.1221042871, AccY: -0.05506663769, AccZ: 9.852438927, Absolute: 9.853349410 }
+];
+function generateSine(f=5, Fs=500, secs=2, amp=1) {
+  const N = Math.floor(Fs * secs);
+  const out = [];
+  for (let i=0;i<N;i++){
+    const t = i / Fs;
+    out.push({ Time: t, AccX: amp*Math.sin(2*Math.PI*f*t), AccY:0, AccZ:0 });
+  }
+  return out;
+}
+const synth5Hz = generateSine(5, 500, 2, 0.5);
+/* =========================
+   Quick self-test functions (callable from console)
+   ========================= */
+function testPhyphoxExcerpt() {
+  state.rawData = samplePhyphoxExcerpt;
+  calcSamplingRate(state.rawData);
+  state.zeroApplied = true;
+  const detrended = applyAdvancedDetrending(state.rawData);
+  console.log('detrended', detrended);
+  const dec = decimateData(detrended, 1);
+  const res = integrateData(dec); 
+  console.log('integrate results', res);
+  setStatus('Test estratto Phyphox eseguito (console).', false);
+}
+function testSynth5Hz() {
+  state.rawData = synth5Hz;
+  calcSamplingRate(state.rawData);
+  state.zeroApplied = false;
+  state.processedData = decimateData(state.rawData, 1);
+  const res = integrateData(state.processedData); 
+  console.log('synth results', res);
+  setStatus('Test synth 5Hz eseguito (console).', false);
+}
+</script>
+
+<script>
+/* =========================
+   Logica Bottoni Grafici (Mutua Esclusione)
+   ========================= */
+
+/* MODIFICA: La funzione ora mostra Acc+Disp e nasconde Incl */
+function showPeaksAndDisplacementSimple() {
+  if (!state.processedData || state.processedData.length < 3) { setStatus('Esegui prima Elabora per generare processedData', true); return; }
+  
+  // 1. Mostra/Nascondi Grafici
+  $('accelChart').closest('.chart-container').classList.remove('is-hidden');
+  $('displacementChart').closest('.chart-container').classList.remove('is-hidden');
+  $('velocityChart').closest('.chart-container').classList.add('is-hidden'); // Nasconde Inclinazione/Velocità
+  
+  // 2. Trova e disegna picchi (Max/Min) sui singoli assi
+  const data = state.processedData;
+  const peaksX = findPeaks(data.map(d => d.AccX));
+  const peaksY = findPeaks(data.map(d => d.AccY));
+  const peaksZ = findPeaks(data.map(d => d.AccZ));
+
+  // Prepara annotazioni
+  const allPeaks = [
+      ...peaksX.map(p => ({...p, color: 'red'})),
+      ...peaksY.map(p => ({...p, color: 'green'})),
+      ...peaksZ.map(p => ({...p, color: 'blue'}))
+  ];
+  
+  // Pulisce annotazioni vecchie e aggiunge le nuove
+  if (charts.acc) {
+      annotatePeaksOnChart(charts.acc, allPeaks);
+  }
+
+  // Forza resize
+  setTimeout(()=>{ try { charts.acc?.resize(); charts.disp?.resize(); } catch(e){} }, 40);
+  setStatus('Mostrati Picchi (Max/Min) e Spostamento.', false);
+}
+
+/* crea bottone "Mostra Picchi & Spostamento" */
+(function(){
+  const btn = document.createElement('button');
+  btn.textContent = 'Mostra Picchi & Spostamento';
+  btn.className = 'px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700';
+  btn.style.marginTop = '8px'; 
+  btn.onclick = showPeaksAndDisplacementSimple;
+  
+  const target = document.getElementById('displacementChart')?.closest('.chart-container');
+  
+  if (target) {
+      const wrapper = document.createElement('div');
+      wrapper.style.textAlign = 'right';
+      wrapper.appendChild(btn);
+      target.appendChild(wrapper);
+  } else {
+      document.querySelector('#controlsCard .grid')?.appendChild(btn);
+  }
+})();
+</script>
+
+<script>
+// Helper: orientazione in gradi e fattore di conversione unità
+function computeOrientationDegrees(sample) {
+  // Usa i dati raw (non processati) per l'inclinazione
+  const rawSample = state.rawData.find(r => r.Time === sample.Time) || sample;
+  const ax = rawSample.AccX || 0;
+  const ay = rawSample.AccY || 0;
+  const az = rawSample.AccZ || 0;
+  const roll = Math.atan2(ay, az);
+  const pitch = Math.atan2(-ax, Math.sqrt(ay*ay + az*az));
+  return { rollDeg: roll * 180 / Math.PI, pitchDeg: pitch * 180 / Math.PI };
+}
+function unitConversionFactorToDisplay(unit) {
+  if (!unit) return 1;
+  if (unit === 'm') return 1;
+  if (unit === 'cm') return 100;
+  if (unit === 'mm') return 1000;
+  return 1;
+}
+
+// Prepara inclinazioni e spostamenti convertiti (usa state.processedData e state.fullResults)
+function prepareOrientationAndConvertedDisplacement() {
+  if (!state.processedData || !state.fullResults) return null;
+  const N = state.processedData.length;
+  const rolls = new Array(N);
+  const pitchs = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const o = computeOrientationDegrees(state.processedData[i]);
+    rolls[i] = o.rollDeg;
+    pitchs[i] = o.pitchDeg;
+  }
+  const disp = state.fullResults.displacement || {};
+  const unit = (typeof unitSelector !== 'undefined' && unitSelector && unitSelector.value) ? unitSelector.value : (document.getElementById('unitSelector')?.value || 'm');
+  const conv = unitConversionFactorToDisplay(unit);
+  const dispX = (disp.x || []).map(v => (v === undefined ? 0 : v * conv));
+  const dispY = (disp.y || []).map(v => (v === undefined ? 0 : v * conv));
+  const dispZ = (disp.z || []).map(v => (v === undefined ? 0 : v * conv));
+  return { rolls, pitchs, dispX, dispY, dispZ, unit, conv };
+}
+
+/* MODIFICA: La funzione ora mostra Incl+Disp e nasconde Acc */
+function showDisplacementAndInclination() {
+  const prepared = prepareOrientationAndConvertedDisplacement();
+  if (!prepared) { setStatus && setStatus('Dati mancanti: esegui elaborazione full prima', true); return; }
+
+  // 1. Mostra/Nascondi Grafici
+  $('accelChart').closest('.chart-container').classList.add('is-hidden'); // Nasconde Accelerazione
+  $('displacementChart').closest('.chart-container').classList.remove('is-hidden');
+  $('velocityChart').closest('.chart-container').classList.remove('is-hidden');
+  
+  const unitLabel = prepared.unit === 'cm' ? 'cm' : prepared.unit === 'mm' ? 'mm' : 'm';
+  const labelEl = document.getElementById('dispUnitLabel');
+  if (labelEl) labelEl.textContent = `(${unitLabel})`;
+
+  const N = state.processedData.length;
+  const maxPlot = Math.min(state.maxPointsRender || 2000, 2000);
+  const step = Math.max(1, Math.ceil(N / maxPlot));
+  const sampledIdx = [];
+  for (let i = 0; i < N; i += step) sampledIdx.push(i);
+  const labels = sampledIdx.map(i => state.processedData[i].Time.toFixed(3));
+
+  const dispX = sampledIdx.map(i => prepared.dispX[i] !== undefined ? prepared.dispX[i] : 0);
+  const dispY = sampledIdx.map(i => prepared.dispY[i] !== undefined ? prepared.dispY[i] : 0);
+  const dispZ = sampledIdx.map(i => prepared.dispZ[i] !== undefined ? prepared.dispZ[i] : 0);
+
+  // FIX: Chiamata a destroyCharts() per prevenire il crash
+  destroyCharts();
+
+  const ctxD = document.getElementById('displacementChart').getContext('2d');
+  charts.disp = new Chart(ctxD, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: `DispX (${unitLabel})`, data: dispX, borderColor: 'red', pointRadius: 0 },
+        { label: `DispY (${unitLabel})`, data: dispY, borderColor: 'green', pointRadius: 0 },
+        { label: `DispZ (${unitLabel})`, data: dispZ, borderColor: 'blue', pointRadius: 0 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, spanGaps: true }
+  });
+
+  try {
+    const velChartEl = document.getElementById('velocityChart');
+    const velHeader = velChartEl.closest('.chart-container').querySelector('h3');
+    if (velHeader) velHeader.innerHTML = 'Inclinazione (Roll, Pitch) <span class="small">(gradi)</span>';
+    velChartEl.closest('.chart-container').classList.remove('is-hidden');
+  } catch(e) {}
+  
+  // 'charts.incl' è già stato distrutto da destroyCharts()
+  const ctxI = document.getElementById('velocityChart').getContext('2d');
+  const inclLabels = sampledIdx.map(i => state.processedData[i].Time.toFixed(3));
+  const inclRoll = sampledIdx.map(i => prepared.rolls[i]);
+  const inclPitch = sampledIdx.map(i => prepared.pitchs[i]);
+  charts.incl = new Chart(ctxI, { // Assegna a charts.incl
+    type: 'line',
+    data: {
+      labels: inclLabels,
+      datasets: [
+        { label: 'Roll (deg)', data: inclRoll, borderColor: 'purple', pointRadius: 0 },
+        { label: 'Pitch (deg)', data: inclPitch, borderColor: 'orange', pointRadius: 0 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, spanGaps: true }
+  });
+
+  document.getElementById('chartsSection')?.classList.remove('is-hidden');
+  setTimeout(()=>{ try { charts.disp?.resize(); charts.incl?.resize(); } catch(e){} }, 40);
+  setStatus && setStatus('Spostamento convertito e inclinazione calcolata', false);
+}
+
+// Crea bottone "Mostra Spostamento & Inclinazione"
+(function addQuickButton(){
+  if (document.getElementById('btnShowDispIncl')) return;
+  const btn = document.createElement('button');
+  btn.id = 'btnShowDispIncl';
+  btn.textContent = 'Mostra Spostamento & Inclinazione';
+  
+  btn.className = 'px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700';
+  btn.style.marginTop = '8px'; 
+  btn.onclick = showDisplacementAndInclination;
+  
+  const target = document.getElementById('velocityChart')?.closest('.chart-container');
+  
+  if (target) {
+      const wrapper = document.createElement('div');
+      wrapper.style.textAlign = 'right';
+      wrapper.appendChild(btn);
+      target.appendChild(wrapper);
+  } else {
+      document.querySelector('#controlsCard .grid')?.appendChild(btn);
+  }
+})();
+</script>
+</body>
+</html>
